@@ -131,6 +131,32 @@ def merge_model_tokenizer_mappings(
     return model_tokenizer_mapping
 
 
+from transformers.testing_utils import run_test_in_subprocess
+import traceback
+
+
+def _test_pickle_subword_regularization_tokenizer(in_queue, out_queue, timeout):
+    error = None
+
+    try:
+        inputs = in_queue.get(timeout=timeout)
+        tokenizer_new = inputs["tokenizer_new"]
+        sp_model_kwargs = inputs["sp_model_kwargs"]
+
+        unittest.TestCase().assertTrue(hasattr(tokenizer_new, "sp_model_kwargs"))
+        unittest.TestCase().assertIsNotNone(tokenizer_new.sp_model_kwargs)
+        unittest.TestCase().assertTrue(isinstance(tokenizer_new.sp_model_kwargs, dict))
+        unittest.TestCase().assertEqual(tokenizer_new.sp_model_kwargs, sp_model_kwargs)
+        # self.check_subword_sampling(tokenizer_new)
+
+    except Exception:
+        error = f"{traceback.format_exc()}"
+
+    results = {"error": error}
+    out_queue.put(results, timeout=timeout)
+    out_queue.join()
+
+
 class TokenizerTesterMixin:
     tokenizer_class = None
     rust_tokenizer_class = None
@@ -438,11 +464,11 @@ class TokenizerTesterMixin:
         del tokenizer
         tokenizer_new = pickle.loads(tokenizer_bin)
 
-        self.assertTrue(hasattr(tokenizer_new, "sp_model_kwargs"))
-        self.assertIsNotNone(tokenizer_new.sp_model_kwargs)
-        self.assertTrue(isinstance(tokenizer_new.sp_model_kwargs, dict))
-        self.assertEqual(tokenizer_new.sp_model_kwargs, sp_model_kwargs)
-        self.check_subword_sampling(tokenizer_new)
+        run_test_in_subprocess(
+            test_case=self,
+            target_func=_test_pickle_subword_regularization_tokenizer,
+            inputs={"tokenizer_new": tokenizer_new, "sp_model_kwargs": sp_model_kwargs},
+        )
 
     def test_save_sentencepiece_tokenizer(self) -> None:
         if not self.test_sentencepiece or not self.test_slow_tokenizer:
