@@ -51,12 +51,16 @@ tokenizer = LlamaTokenizer.from_pretrained("/output/path")
 
 Important note: you need to be able to host the whole model in RAM to execute this script (even if the biggest versions
 come in several checkpoints they each contain a part of each weight of the model, so we need to load them all in RAM).
+
+CodeLlama note: Your original weights will need to be placed in `7B`, `13B`, `34B`, etc. directories, and the `tokenizer.model`
+in the root directory where your `--input_dir` argument will be pointing to.
 """
 
 INTERMEDIATE_SIZE_MAP = {
     "7B": 11008,
     "13B": 13824,
     "30B": 17920,
+    "34B": 22100,
     "65B": 22016,
     "70B": 28672,
 }
@@ -66,6 +70,7 @@ NUM_SHARDS = {
     "13B": 2,
     "13Bf": 2,
     "30B": 4,
+    "34B": 4,
     "65B": 8,
     "70B": 8,
     "70Bf": 8,
@@ -260,7 +265,7 @@ def write_model(model_path, input_base_path, model_size, safe_serialization=True
     # Avoid saving this as part of the config.
     del model.config._name_or_path
 
-    print("Saving in the Transformers format.")
+    print("Saving in the HuggingFace Transformers format.")
     model.save_pretrained(model_path, safe_serialization=safe_serialization)
     shutil.rmtree(tmp_model_path)
 
@@ -281,7 +286,7 @@ def main():
     )
     parser.add_argument(
         "--model_size",
-        choices=["7B", "7Bf", "13B", "13Bf", "30B", "65B", "70B", "70Bf", "tokenizer_only"],
+        choices=["7B", "7Bf", "13B", "13Bf", "30B", "34B", "65B", "70B", "70Bf", "tokenizer_only"],
         help="'f' models correspond to the finetuned versions, and are specific to the Llama2 official release. For more details on Llama2, checkout the original repo: https://huggingface.co/meta-llama",
     )
     parser.add_argument(
